@@ -8,7 +8,7 @@ import re
 
 
 
-class log():
+class log:
     def __init__(self, out_file):
         self.out = open(out_file, 'w')
         self.__call__('Log recording start: {} '.format(strftime("%Y-%m-%d %H:%M:%S", gmtime())), 0)
@@ -18,52 +18,8 @@ class log():
         sys.stderr.write(msg_to_out)
         self.out.write(msg_to_out)
 
-
-def main():
-    PYTHON_PATH = '/home/lucassilva/virtualenviroment/bin/python'
-    GTF_TO_FASTA_PATH = '/usr/bin/gtf_to_fasta'
-    LNCSCORE_PATH = '/work/lncrnas/lucassilva/trofoblasto/scripts/lncScore/lncScore.py'
-
-
-
-    obj = argparse.ArgumentParser(description='Transform a gtf cufflinks out in a repertory with new lncRNAs\n'
-                                              'Obs: This scripts removes transcripts that length less than  200 bp\n'
-                                              'Use Example:\n'
-                                              "python  path/to/gtf2newgenes.py \n -O path/to/create/the/out_test\n-T path/to/transcripts.gtf\n-G path/to/genome.fa"
-                                              )
-    obj.add_argument('-G', help='Genome fasta file', required=True)
-    obj.add_argument('-T', help=' GTF with Transcripts cufflinks (non-restricted) out', required=True)
-    obj.add_argument('-P', help='Number of threads', required=True)
-    obj.add_argument('-O', help='Out dir: This dir will be create', required=True)
-    parser = obj.parse_args()
-    create_out_dir(parser.O)
-    log_print = log(parser.O + '/run.log')
-    log_print('retirar genes com fpkm 0 ', 5)
-    log_print('Converting {} to .FASTA'.format(parser.T), 1)
-    gtf_to_fasta(gtf2fasta=GTF_TO_FASTA_PATH,
-                 gtf=parser.T,
-                 genome=parser.G,
-                 out_file=parser.O + '/temp_fasta.fasta',
-                 log_print=log_print)
-    log_print('Successful conversion'.format(parser.T), 1)
-
-    log_print('Searching for lncRNAs', 1)
-
-    lncscore(python_path=PYTHON_PATH,
-             lncscore_path=LNCSCORE_PATH,
-             fasta_trans_gtf=parser.O + '/temp_fasta.fasta',
-             gtf_ref=parser.T,
-             out='lncrnascore_out',
-             threads=parser.P,
-             hexamer='/work/lncrnas/lucassilva/trofoblasto/scripts/lncScore/dat/Human_Hexamer.tsv',
-             train_set='/work/lncrnas/lucassilva/trofoblasto/scripts/lncScore/dat/Human_training.dat',
-             log=log_print)
-
-    create_a_gtf_modify(gtf_name=parser.T, saida=parser.O + '/gtf_file_with_predictions.gtf', score_file='lncrnascore_out')
-    log_print('Creating a new gtf file with prediction references at {}'.format(parser.O + '/gtf_file_with_predictions.gtf'), 1 )
-    os.system('rm {}'.format(parser.O + '/temp_fasta.fasta'))
-    log_print('Removing file: {}'.format(parser.O + '/temp_fasta.fasta'), 1 )
-    log_print('Analysis successful', 1 )
+def getScriptPath():
+    return os.path.dirname(os.path.realpath(sys.argv[0]))
 
 def create_a_gtf_modify(gtf_name, saida, score_file):
     # print open(score_file).read().split('\n')[1:]
@@ -140,6 +96,72 @@ def lncscore(python_path, lncscore_path, fasta_trans_gtf, gtf_ref, out, threads,
         sys.exit(1)
     else:
         pass
+
+
+def main():
+
+    if os.popen('which gtf_to_fasta').read():
+        GTF_TO_FASTA_PATH = 'gtf_to_fasta'
+    else:
+        sys.stderr.write("Plese install gtf_to_fasta (TUXEDO TOOLS SCRIPT) in your path " + "\n")
+
+
+
+    obj = argparse.ArgumentParser(description='Transform a gtf cufflinks out in a repertory with new lncRNAs\n'
+                                              'Obs: This scripts removes transcripts that length less than  200 bp\n'
+                                              'Use Example:\n'
+                                              "python  path/to/gtf2newgenes.py \n -O path/to/create/the/out_test\n-T path/to/transcripts.gtf\n-G path/to/genome.fa"
+                                              )
+    obj.add_argument('-G', help='Genome fasta file', required=True)
+    obj.add_argument('-T', help=' GTF with cufflinks Transcripts  (non-restricted) out', required=True)
+    obj.add_argument('-P', help='Number of threads', required=True)
+    obj.add_argument('-O', help='Out dir: This dir will be create', required=True)
+    obj.add_argument('-l', help='Optional: LncScore path')
+    obj.add_argument('-python_path', help='Optional: Custom python path')
+    parser = obj.parse_args()
+
+    if not parser.l:
+        LNCSCORE_PATH = getScriptPath()+'/lncScore/lncScore.py'
+        print LNCSCORE_PATH
+    else:
+        LNCSCORE_PATH = parser.l
+
+
+    if not parser.python_path:
+        PYTHON_PATH = 'python2.7'
+    else:
+        PYTHON_PATH = parser.python_path
+
+
+
+    create_out_dir(parser.O)
+    log_print = log(parser.O + '/run.log')
+    log_print('retirar genes com fpkm 0 ', 5)
+    log_print('Converting {} to .FASTA'.format(parser.T), 1)
+    gtf_to_fasta(gtf2fasta=GTF_TO_FASTA_PATH,
+                 gtf=parser.T,
+                 genome=parser.G,
+                 out_file=parser.O + '/temp_fasta.fasta',
+                 log_print=log_print)
+    log_print('Successful conversion'.format(parser.T), 1)
+
+    log_print('Searching for lncRNAs', 1)
+
+    lncscore(python_path=PYTHON_PATH,
+             lncscore_path=LNCSCORE_PATH,
+             fasta_trans_gtf=parser.O + '/temp_fasta.fasta',
+             gtf_ref=parser.T,
+             out='lncrnascore_out',
+             threads=parser.P,
+             hexamer=getScriptPath()+'/lncScore/dat/Human_Hexamer.tsv',
+             train_set=getScriptPath()+'/lncScore/dat/Human_training.dat',
+             log=log_print)
+
+    create_a_gtf_modify(gtf_name=parser.T, saida=parser.O + '/gtf_file_with_predictions.gtf', score_file='lncrnascore_out')
+    log_print('Creating a new gtf file with prediction references at {}'.format(parser.O + '/gtf_file_with_predictions.gtf'), 1 )
+    os.system('rm {}'.format(parser.O + '/temp_fasta.fasta'))
+    log_print('Removing file: {}'.format(parser.O + '/temp_fasta*'), 1 )
+    log_print('Analysis successful', 1 )
 
 
 if __name__ == '__main__':
